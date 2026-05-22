@@ -78,6 +78,7 @@ class GoogleMapsClient(AbstractApiClient):
 
         title = await self._text('h1')
         body_text = await self._body_text()
+        dom_data = await self._dom_detail_data()
         current_url = self.page.url
         shop_id = parse_shop_id_from_url(current_url or detail_url)
         shop_lat, shop_lng = parse_coordinates_from_url(current_url or detail_url)
@@ -93,17 +94,19 @@ class GoogleMapsClient(AbstractApiClient):
             shop_id=shop_id,
             shop_name=title or self._parse_name_from_url(current_url or detail_url),
             level=level,
-            category=self._parse_category(body_text),
+            category=dom_data.get("category") or self._parse_category(body_text),
             is_open=is_open,
             shop_lat=shop_lat,
             shop_lng=shop_lng,
             crawl_lat=task.point.lat,
             crawl_lng=task.point.lng,
-            address=await self._button_text(["Endereço", "Address", "Direções"]),
-            phone=await self._button_text(["Telefone", "Phone"]),
-            official_url=self._normalize_google_redirect_url(await self._website_url()),
+            address=dom_data.get("address") or await self._button_text(["Endereço", "Address", "Direções"]),
+            phone=dom_data.get("phone") or await self._button_text(["Telefone", "Phone"]),
+            official_url=self._normalize_google_redirect_url(dom_data.get("official_url") or await self._website_url()),
             user_ratings_total=ratings,
             avg_price=avg_price,
+            open_hours=dom_data.get("open_hours") or [],
+            service_options=dom_data.get("service_options") or [],
             real_shop_state=normalize_shop_state(is_open),
             currency_symbol=currency_symbol,
             price_range=price_range,
@@ -145,6 +148,47 @@ class GoogleMapsClient(AbstractApiClient):
         locator = self.page.locator('a[data-item-id="authority"], a[aria-label*="Website"], a[aria-label*="Site"]').first
         if await locator.count() == 0:
             return ""
+
+    async def _dom_detail_data(self) -> dict:
+        script = r"""
+        () => {
+          const clean = (value) => (value || '').replace(/\s+/g, ' ').trim();
+          const serviceTokens = ['Refeição no local', 'Para viagem', 'Entrega', 'Drive-through', 'Retirada', 'Delivery', 'Takeaway', 'Dine-in'];
+          const controls = Array.from(document.querySelectorAll('button,a'));
+          const byDataItem = (prefix) => controls.find((el) => (el.getAttribute('data-item-id') || '').startsWith(prefix));
+          const byAria = (text) => controls.find((el) => (el.getAttribute('aria-label') || '').includes(text));
+          const category = controls
+            .filter((el) => (el.getAttribute('jsaction') || '').includes('.category'))
+            .map((el) => clean(el.innerText))
+            .filter(Boolean);
+          const addressEl = byDataItem('address') || byAria('Endereço:') || byAria('Address:');
+          const phoneEl = byDataItem('phone:') || byAria('Telefone:') || byAria('Phone:');
+          const websiteEl = byDataItem('authority') || byAria('Website:') || byAria('Site:');
+          const hourTexts = controls
+            .map((el) => clean(el.getAttribute('aria-label') || ''))
+            .filter((text) => text.includes('Copiar horário de funcionamento') || text.includes('Copy business hours'));
+          const rawServiceTexts = Array.from(document.querySelectorAll('[aria-label], div, span'))
+            .map((el) => clean(el.getAttribute('aria-label') || el.innerText || ''))
+            .filter((text) => /Entrega|Retirada|Para viagem|Refeição no local|Drive-through|delivery|takeaway|dine-in/i.test(text))
+            .filter((text, index, arr) => text.length <= 80 && arr.indexOf(text) === index)
+            .slice(0, 12);
+          const serviceTexts = serviceTokens.filter((token) => rawServiceTexts.some((text) => text.toLowerCase().includes(token.toLowerCase())));
+          const address = clean(addressEl?.getAttribute('aria-label') || '').replace(/^Endereço:\s*/i, '').replace(/^Address:\s*/i, '');
+          const phone = clean(phoneEl?.getAttribute('aria-label') || phoneEl?.innerText || '').replace(/^Telefone:\s*/i, '').replace(/^Phone:\s*/i, '');
+          return {
+            category,
+            address,
+            phone,
+            official_url: websiteEl?.href || '',
+            open_hours: hourTexts.map((text) => text.replace(/,\s*Copiar horário de funcionamento$/i, '').replace(/,\s*Copy business hours$/i, '')),
+            service_options: serviceTexts
+          };
+        }
+        """
+        try:
+            return await self.page.evaluate(script)
+        except Exception:
+            return {}
         try:
             return await locator.get_attribute("href") or ""
         except Exception:

@@ -260,3 +260,36 @@ config/
 | 第三阶段 | 接入 WebUI、运行监控、批量调度、导出报告、稳定性增强 |
 
 第一阶段不是最终目标，只是完整插件交付路径中的第一步。最终必须完成第二阶段和第三阶段，让 `google_maps` 成为 MediaCrawler 中可启动、可配置、可采集、可去重、可断点续采、可在 WebUI 操作、可导出交付数据的正式平台。
+
+## 17. 当前运行方式
+
+| 场景 | 命令 |
+| --- | --- |
+| 初始化 SQLite 表 | `uv run python main.py --init_db sqlite` |
+| 运行 1 条真实采集任务 | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option jsonl --headless false` |
+| 使用 SQLite 保存并支持断点状态 | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` |
+| 全量任务执行 | `GOOGLE_MAPS_TASK_LIMIT=0 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` |
+
+## 18. 当前关键配置
+
+| 配置 | 默认值 | 说明 |
+| --- | --- | --- |
+| `GOOGLE_MAPS_POINTS_FILE` | `../谷歌巴西-采集点位_test(1).csv` | 点位 CSV 路径 |
+| `GOOGLE_MAPS_TASK_LIMIT` | `1` | 单次执行任务数；`0` 表示全量 |
+| `GOOGLE_MAPS_USE_SYSTEM_CHROME` | `true` | 优先使用系统 Google Chrome |
+| `GOOGLE_MAPS_CHROME_EXECUTABLE_PATH` | `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` | macOS Chrome 路径 |
+| `GOOGLE_MAPS_LOCALE` | `pt-BR` | Google Maps 页面语言 |
+| `GOOGLE_MAPS_TIMEZONE` | `America/Sao_Paulo` | 浏览器时区 |
+| `GOOGLE_MAPS_ZOOM` | `20z` | 地图缩放级别 |
+| `GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK` | `20` | 单任务最多进入详情页数量 |
+
+## 19. 当前真实采集验证结果
+
+| 验证项 | 结果 |
+| --- | --- |
+| 点位读取 | 1005 个 |
+| 任务生成 | 25125 个 |
+| 真实浏览器 | 系统 Google Chrome headed 模式跑通 |
+| 单任务样例 | `Itabira / -19.628,-43.232 / café` |
+| 店铺召回 | 成功召回并保存 `Panhok Padaria Artesanal` 等店铺 |
+| 已验证字段 | `shop_id`、`shop_name`、`level`、`category`、`address`、`phone`、`official_url`、`avg_price`、`open_hours`、`service_options`、`shop_lat`、`shop_lng` |

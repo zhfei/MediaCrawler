@@ -34,9 +34,23 @@ def _without_internal_fields(content_item: Dict) -> Dict:
     return {key: value for key, value in content_item.items() if not key.startswith("_")}
 
 
+def _only_output_fields(content_item: Dict) -> Dict:
+    return {key: content_item.get(key, "" if key not in {"keyword", "category", "open_hours", "service_options"} else []) for key in GOOGLE_MAPS_SHOP_OUTPUT_FIELDS}
+
+
+def _serialize_collection_fields(content_item: Dict) -> Dict:
+    item = dict(content_item)
+    for key in ("keyword", "category", "open_hours", "service_options"):
+        value = item.get(key)
+        if isinstance(value, str):
+            continue
+        item[key] = json.dumps(value or [], ensure_ascii=False)
+    return item
+
+
 class GoogleMapsCsvStoreImplement(AbstractStore):
     async def store_content(self, content_item: Dict):
-        content_item = _without_internal_fields(content_item)
+        content_item = _serialize_collection_fields(_only_output_fields(_without_internal_fields(content_item)))
         file_path = _data_dir("csv") / f"search_shops_{utils.get_current_date()}.csv"
         file_exists = file_path.exists()
         with file_path.open("a", newline="", encoding="utf-8-sig") as file:
@@ -54,7 +68,7 @@ class GoogleMapsCsvStoreImplement(AbstractStore):
 
 class GoogleMapsJsonlStoreImplement(AbstractStore):
     async def store_content(self, content_item: Dict):
-        content_item = _without_internal_fields(content_item)
+        content_item = _only_output_fields(_without_internal_fields(content_item))
         file_path = _data_dir("jsonl") / f"search_shops_{utils.get_current_date()}.jsonl"
         async with aiofiles.open(file_path, "a", encoding="utf-8") as file:
             await file.write(json.dumps(content_item, ensure_ascii=False) + "\n")
@@ -68,7 +82,7 @@ class GoogleMapsJsonlStoreImplement(AbstractStore):
 
 class GoogleMapsJsonStoreImplement(AbstractStore):
     async def store_content(self, content_item: Dict):
-        content_item = _without_internal_fields(content_item)
+        content_item = _only_output_fields(_without_internal_fields(content_item))
         file_path = _data_dir("json") / f"search_shops_{utils.get_current_date()}.json"
         existing = []
         if file_path.exists() and file_path.stat().st_size > 0:
@@ -98,6 +112,7 @@ class GoogleMapsDbStoreImplement(AbstractStore):
         async with get_session() as session:
             task_id = content_item.pop("_task_id", "")
             keyword = content_item.pop("_task_keyword", "")
+            content_item = _serialize_collection_fields(content_item)
             stmt = select(GoogleMapsShopModel).where(GoogleMapsShopModel.shop_id == shop_id)
             res = await session.execute(stmt)
             db_shop = res.scalar_one_or_none()

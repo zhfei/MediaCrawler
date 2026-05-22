@@ -212,7 +212,14 @@ class GoogleMapsCrawler(AbstractCrawler):
             "--no-sandbox",
             f"--lang={config.GOOGLE_MAPS_LOCALE}",
         ]
-        browser = await chromium.launch(headless=headless, args=args, proxy=playwright_proxy)
+        launch_kwargs = {
+            "headless": headless,
+            "args": args,
+            "proxy": playwright_proxy,
+        }
+        if config.GOOGLE_MAPS_USE_SYSTEM_CHROME and config.GOOGLE_MAPS_CHROME_EXECUTABLE_PATH:
+            launch_kwargs["executable_path"] = config.GOOGLE_MAPS_CHROME_EXECUTABLE_PATH
+        browser = await chromium.launch(**launch_kwargs)
         return await browser.new_context(
             user_agent=user_agent,
             locale=config.GOOGLE_MAPS_LOCALE,

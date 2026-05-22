@@ -2,7 +2,6 @@
 
 import csv
 import hashlib
-import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -157,8 +156,6 @@ def normalize_shop_state(open_text: str) -> str:
 
 def ensure_shop_defaults(shop: GoogleMapsShop) -> dict:
     data = shop.model_dump()
-    for key in ("keyword", "category", "open_hours", "service_options"):
-        data[key] = json.dumps(data.get(key) or [], ensure_ascii=False)
     if not data.get("create_time"):
         data["create_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return data

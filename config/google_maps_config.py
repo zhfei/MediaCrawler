@@ -10,6 +10,15 @@ GOOGLE_MAPS_LOCALE = "pt-BR"
 GOOGLE_MAPS_TIMEZONE = "America/Sao_Paulo"
 GOOGLE_MAPS_ZOOM = "20z"
 GOOGLE_MAPS_INDEX_URL = "https://www.google.com/maps"
+GOOGLE_MAPS_USE_SYSTEM_CHROME = os.getenv("GOOGLE_MAPS_USE_SYSTEM_CHROME", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+GOOGLE_MAPS_CHROME_EXECUTABLE_PATH = os.getenv(
+    "GOOGLE_MAPS_CHROME_EXECUTABLE_PATH",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+)
 
 # Run MediaCrawler from the MediaCrawler directory; the source CSV lives in the
 # parent project directory for this task.
