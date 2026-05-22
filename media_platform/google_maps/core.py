@@ -41,7 +41,7 @@ class GoogleMapsCrawler(AbstractCrawler):
     async def start(self):
         utils.logger.info("[GoogleMapsCrawler.start] Google Maps crawler starting ...")
         async with async_playwright() as playwright:
-            if config.ENABLE_CDP_MODE:
+            if config.GOOGLE_MAPS_ENABLE_CDP_MODE:
                 utils.logger.info("[GoogleMapsCrawler.start] Launching browser in CDP mode")
                 self.browser_context = await self.launch_browser_with_cdp(
                     playwright,
@@ -101,38 +101,50 @@ class GoogleMapsCrawler(AbstractCrawler):
             await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
 
     async def _run_task(self, task: GoogleMapsTask):
-        await self._save_task_state(task, GoogleMapsTaskStatus.RUNNING.value)
-        try:
-            await self.google_maps_client.open_task_search(task)
-            result_links = await self.google_maps_client.collect_result_links()
-            utils.logger.info(
-                f"[GoogleMapsCrawler._run_task] task={task.task_id} links={len(result_links)}"
-            )
-            if not result_links:
+        max_attempts = max(1, config.GOOGLE_MAPS_MAX_RETRY_TIMES + 1)
+        for attempt in range(1, max_attempts + 1):
+            await self._save_task_state(task, GoogleMapsTaskStatus.RUNNING.value)
+            try:
+                await self.google_maps_client.open_task_search(task)
+                result_links = await self.google_maps_client.collect_result_links()
+                utils.logger.info(
+                    f"[GoogleMapsCrawler._run_task] task={task.task_id} attempt={attempt} links={len(result_links)}"
+                )
+                if not result_links:
+                    await self._save_task_state(task, GoogleMapsTaskStatus.SUCCESS.value)
+                    return
+
+                saved = 0
+                for detail_url in result_links:
+                    shop = await self.google_maps_client.extract_shop_from_url(task, detail_url)
+                    if not shop.shop_id:
+                        continue
+                    await google_maps_store.update_google_maps_shop(
+                        shop,
+                        task_id=task.task_id,
+                        task_keyword=task.keyword,
+                    )
+                    saved += 1
+                utils.logger.info(
+                    f"[GoogleMapsCrawler._run_task] task={task.task_id} saved_shops={saved}"
+                )
                 await self._save_task_state(task, GoogleMapsTaskStatus.SUCCESS.value)
                 return
-
-            saved = 0
-            for detail_url in result_links:
-                shop = await self.google_maps_client.extract_shop_from_url(task, detail_url)
-                if not shop.shop_id:
-                    continue
-                await google_maps_store.update_google_maps_shop(
-                    shop,
-                    task_id=task.task_id,
-                    task_keyword=task.keyword,
+            except Exception as exc:
+                screenshot = await self._save_error_screenshot(task)
+                utils.logger.error(
+                    f"[GoogleMapsCrawler._run_task] task={task.task_id} attempt={attempt} "
+                    f"failed error={exc} screenshot={screenshot}"
                 )
-                saved += 1
-            utils.logger.info(
-                f"[GoogleMapsCrawler._run_task] task={task.task_id} saved_shops={saved}"
-            )
-            await self._save_task_state(task, GoogleMapsTaskStatus.SUCCESS.value)
-        except Exception as exc:
-            screenshot = await self._save_error_screenshot(task)
-            utils.logger.error(
-                f"[GoogleMapsCrawler._run_task] task={task.task_id} failed error={exc} screenshot={screenshot}"
-            )
-            await self._save_task_state(task, GoogleMapsTaskStatus.FAILED.value, str(exc))
+                await google_maps_store.add_google_maps_run_log(
+                    task_id=task.task_id,
+                    level="error",
+                    message=str(exc),
+                    screenshot_path=screenshot,
+                )
+                await self._save_task_state(task, GoogleMapsTaskStatus.FAILED.value, str(exc))
+                if attempt < max_attempts:
+                    await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
 
     async def _save_task_state(self, task: GoogleMapsTask, status: str, last_error: str = ""):
         task.status = status

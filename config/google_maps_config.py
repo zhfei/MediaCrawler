@@ -10,6 +10,11 @@ GOOGLE_MAPS_LOCALE = "pt-BR"
 GOOGLE_MAPS_TIMEZONE = "America/Sao_Paulo"
 GOOGLE_MAPS_ZOOM = "20z"
 GOOGLE_MAPS_INDEX_URL = "https://www.google.com/maps"
+GOOGLE_MAPS_ENABLE_CDP_MODE = os.getenv("GOOGLE_MAPS_ENABLE_CDP_MODE", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 GOOGLE_MAPS_USE_SYSTEM_CHROME = os.getenv("GOOGLE_MAPS_USE_SYSTEM_CHROME", "true").lower() in {
     "1",
     "true",
@@ -62,6 +67,7 @@ GOOGLE_MAPS_SCROLL_TIMES = int(os.getenv("GOOGLE_MAPS_SCROLL_TIMES", "8"))
 GOOGLE_MAPS_SCROLL_SLEEP_SEC = float(os.getenv("GOOGLE_MAPS_SCROLL_SLEEP_SEC", "1.2"))
 GOOGLE_MAPS_DETAIL_SLEEP_SEC = float(os.getenv("GOOGLE_MAPS_DETAIL_SLEEP_SEC", "1.0"))
 GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK = int(os.getenv("GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK", "20"))
+GOOGLE_MAPS_MAX_RETRY_TIMES = int(os.getenv("GOOGLE_MAPS_MAX_RETRY_TIMES", "2"))
 GOOGLE_MAPS_SCREENSHOT_ON_ERROR = os.getenv("GOOGLE_MAPS_SCREENSHOT_ON_ERROR", "true").lower() in {
     "1",
     "true",

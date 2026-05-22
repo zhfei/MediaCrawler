@@ -103,10 +103,13 @@ class GoogleMapsClient(AbstractApiClient):
             address=dom_data.get("address") or await self._button_text(["Endereço", "Address", "Direções"]),
             phone=dom_data.get("phone") or await self._button_text(["Telefone", "Phone"]),
             official_url=self._normalize_google_redirect_url(dom_data.get("official_url") or await self._website_url()),
+            order_url=self._normalize_google_redirect_url(dom_data.get("order_url") or ""),
+            menu_url=self._normalize_google_redirect_url(dom_data.get("menu_url") or ""),
             user_ratings_total=ratings,
             avg_price=avg_price,
             open_hours=dom_data.get("open_hours") or [],
             service_options=dom_data.get("service_options") or [],
+            busy_time=dom_data.get("busy_time") or "",
             real_shop_state=normalize_shop_state(is_open),
             currency_symbol=currency_symbol,
             price_range=price_range,
@@ -148,6 +151,10 @@ class GoogleMapsClient(AbstractApiClient):
         locator = self.page.locator('a[data-item-id="authority"], a[aria-label*="Website"], a[aria-label*="Site"]').first
         if await locator.count() == 0:
             return ""
+        try:
+            return await locator.get_attribute("href") or ""
+        except Exception:
+            return ""
 
     async def _dom_detail_data(self) -> dict:
         script = r"""
@@ -164,9 +171,24 @@ class GoogleMapsClient(AbstractApiClient):
           const addressEl = byDataItem('address') || byAria('Endereço:') || byAria('Address:');
           const phoneEl = byDataItem('phone:') || byAria('Telefone:') || byAria('Phone:');
           const websiteEl = byDataItem('authority') || byAria('Website:') || byAria('Site:');
+          const menuEl = controls.find((el) => {
+            const data = el.getAttribute('data-item-id') || '';
+            const aria = el.getAttribute('aria-label') || '';
+            const text = clean(el.innerText);
+            return /menu|card[aá]pio/i.test(data) || /menu|card[aá]pio/i.test(aria) || /menu|card[aá]pio/i.test(text);
+          });
+          const orderEl = controls.find((el) => {
+            const data = el.getAttribute('data-item-id') || '';
+            const aria = el.getAttribute('aria-label') || '';
+            const text = clean(el.innerText);
+            return /order|pedido|pedir|delivery/i.test(data) || /order|pedido|pedir|delivery/i.test(aria) || /order|pedido|pedir|delivery/i.test(text);
+          });
           const hourTexts = controls
             .map((el) => clean(el.getAttribute('aria-label') || ''))
             .filter((text) => text.includes('Copiar horário de funcionamento') || text.includes('Copy business hours'));
+          const busyText = Array.from(document.querySelectorAll('[aria-label], div, span'))
+            .map((el) => clean(el.getAttribute('aria-label') || el.innerText || ''))
+            .find((text) => /hor[aá]rios? de pico|popular times|movimento|busy/i.test(text) && text.length <= 500) || '';
           const rawServiceTexts = Array.from(document.querySelectorAll('[aria-label], div, span'))
             .map((el) => clean(el.getAttribute('aria-label') || el.innerText || ''))
             .filter((text) => /Entrega|Retirada|Para viagem|Refeição no local|Drive-through|delivery|takeaway|dine-in/i.test(text))
@@ -180,8 +202,11 @@ class GoogleMapsClient(AbstractApiClient):
             address,
             phone,
             official_url: websiteEl?.href || '',
+            menu_url: menuEl?.href || '',
+            order_url: orderEl?.href || '',
             open_hours: hourTexts.map((text) => text.replace(/,\s*Copiar horário de funcionamento$/i, '').replace(/,\s*Copy business hours$/i, '')),
-            service_options: serviceTexts
+            service_options: serviceTexts,
+            busy_time: busyText
           };
         }
         """
@@ -189,10 +214,6 @@ class GoogleMapsClient(AbstractApiClient):
             return await self.page.evaluate(script)
         except Exception:
             return {}
-        try:
-            return await locator.get_attribute("href") or ""
-        except Exception:
-            return ""
 
     @staticmethod
     def _parse_level(text: str) -> Optional[float]:

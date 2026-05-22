@@ -13,6 +13,7 @@ from base.base_crawler import AbstractStore
 from database.db_session import get_session
 from database.models import (
     GoogleMapsPoint as GoogleMapsPointModel,
+    GoogleMapsRunLog,
     GoogleMapsShop as GoogleMapsShopModel,
     GoogleMapsTask as GoogleMapsTaskModel,
     GoogleMapsTaskResult,
@@ -194,6 +195,20 @@ class GoogleMapsDbStoreImplement(AbstractStore):
                 task["add_ts"] = now_ts
                 task["last_modify_ts"] = now_ts
                 session.add(GoogleMapsTaskModel(**task))
+            await session.commit()
+
+    async def store_run_log(self, log_item: Dict):
+        now_ts = utils.get_current_timestamp()
+        async with get_session() as session:
+            session.add(
+                GoogleMapsRunLog(
+                    task_id=log_item.get("task_id", ""),
+                    level=log_item.get("level", "info"),
+                    message=log_item.get("message", ""),
+                    screenshot_path=log_item.get("screenshot_path", ""),
+                    add_ts=now_ts,
+                )
+            )
             await session.commit()
 
     @staticmethod

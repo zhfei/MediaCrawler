@@ -176,7 +176,7 @@ config/
 | `R$60–100` | `R$` | `60-100` | 空 |
 | `+R$ 200` | `R$` | `200+` | 空 |
 | `R$200+` | `R$` | `200+` | 空 |
-| `BRL 50-60 K` | `R$` | `5000-6000` | 空 |
+| `BRL 50-60 K` | `R$` | `50000-60000` | 空 |
 | `Más de BRL 1 K` | `R$` | `1000+` | 空 |
 | `$` / `$$` / `$$$` / `$$$$` | 空 | 空 | 原值 |
 
@@ -259,18 +259,138 @@ config/
 | 第二阶段 | 补全详情字段解析、去重、价格拆分、SQLite/Postgres、断点续采、失败重试 |
 | 第三阶段 | 接入 WebUI、运行监控、批量调度、导出报告、稳定性增强 |
 
+## 17. 当前实现与验证记录
+
+| 项目 | 结果 |
+| --- | --- |
+| 平台注册 | 已支持 `--platform google_maps` |
+| 点位读取 | 已读取 `1005` 个巴西 Itabira 点位 |
+| 任务生成 | 已生成 `25125` 个 `点位 × 关键词` 任务 |
+| 标准字段输出 | 已覆盖方案字段，JSONL 保持数组字段，CSV/DB 序列化数组字段 |
+| SQLite 表 | 已创建 `google_maps_points/tasks/shops/task_results/run_logs` |
+| 断点续采 | SQLite/Postgres 模式下已跳过 `success` 任务 |
+| 失败重试 | 已支持 `GOOGLE_MAPS_MAX_RETRY_TIMES` 自动重试 |
+| WebUI/API | 已新增 `/google-maps` 控制页和 Google Maps 专属 API |
+| API 接口 | 已支持配置、概览、任务预览、任务状态、任务重置、店铺列表、采集报告、CSV/JSON 导出、运行日志 |
+| 运行日志 | 已支持失败任务日志与截图路径落库到 `google_maps_run_logs` |
+| 导出能力 | 已支持 `/api/google-maps/export?file_type=csv/json` |
+| 报告能力 | 已支持关键词、分类、店铺状态、城市维度聚合 |
+| 使用文档 | 已新增 `docs/google_maps_plugin_guide.md` |
+| 单元测试 | 已新增 `tests/test_google_maps_plugin.py`，覆盖点位、任务、URL、价格、状态、字段和存储工厂 |
+| 启动方式 | 与 MediaCrawler 主项目保持一致：通过 `main.py` 或 `uvicorn api.main:app` 启动，不提供插件专属 Docker 入口 |
+| 真实采集验证 | 已采集 `café`、`bar`、`padaria` 三个任务 |
+| 去重合并验证 | `Panhok Padaria Artesanal` 已合并关键词 `["café", "padaria"]`，`report_count=2` |
+| 当前 SQLite 店铺数 | `8` |
+| 当前 SQLite 任务结果数 | `9` |
+| 当前 SQLite 任务状态 | `success=3`，`pending=25122` |
+| 最新真实样例 | `Bar do Tarcisio`、`Bar da Marlene`、`Bar Do Bim`、`Deck`、`Estação Slod Choperia e Gastronomia` |
+| 已验证字段样例 | 店名、评分、分类、地址、电话、官网、营业状态、营业时间、服务项、繁忙时间、店铺坐标、采集坐标 |
+| 本机注意事项 | Codex 沙箱内直接启动 Chromium 会被 macOS Crashpad 权限限制拦截；真实采集需在普通终端或提升权限环境运行 |
+
 第一阶段不是最终目标，只是完整插件交付路径中的第一步。最终必须完成第二阶段和第三阶段，让 `google_maps` 成为 MediaCrawler 中可启动、可配置、可采集、可去重、可断点续采、可在 WebUI 操作、可导出交付数据的正式平台。
 
-## 17. 当前运行方式
+## 18. Google Maps 插件详细启动步骤
 
-| 场景 | 命令 |
+Google Maps 是 MediaCrawler 项目内的平台插件，启动方式必须与 MediaCrawler 主项目保持一致。插件不提供独立 Docker 启动入口，不单独启动后端，也不脱离 `main.py`、`api.main:app`、MediaCrawler WebUI 运行。
+
+### 18.1 前置准备
+
+| 步骤 | 命令/操作 | 说明 |
+| --- | --- | --- |
+| 1 | `cd /Volumes/DK5A1-2TB-SSD/MacMini/爬虫/project1/MediaCrawler` | 进入 MediaCrawler 项目目录 |
+| 2 | `uv sync` | 按 MediaCrawler 原项目方式安装依赖 |
+| 3 | `uv run playwright install chromium` | 安装 Playwright Chromium |
+| 4 | 确认 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` 存在 | macOS 本机默认优先使用系统 Chrome |
+| 5 | 确认 `../谷歌巴西-采集点位_test(1).csv` 存在 | 默认点位 CSV 路径 |
+
+### 18.2 一条指令启动
+
+日常本机使用时，推荐直接用下面这一条指令完成依赖同步、浏览器安装、SQLite 初始化、启动 WebUI API：
+
+```bash
+cd /Volumes/DK5A1-2TB-SSD/MacMini/爬虫/project1/MediaCrawler && { for pid in $(lsof -ti tcp:8080); do kill -9 "$pid"; done; sleep 1; uv sync && uv run playwright install chromium && uv run python main.py --init_db sqlite && uv run uvicorn api.main:app --host 127.0.0.1 --port 8080; }
+```
+
+启动成功后打开：
+
+```text
+http://127.0.0.1:8080/google-maps
+```
+
+| 说明 | 内容 |
 | --- | --- |
-| 初始化 SQLite 表 | `uv run python main.py --init_db sqlite` |
-| 运行 1 条真实采集任务 | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option jsonl --headless false` |
-| 使用 SQLite 保存并支持断点状态 | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` |
-| 全量任务执行 | `GOOGLE_MAPS_TASK_LIMIT=0 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` |
+| 这条指令做什么 | 安装依赖、安装浏览器、初始化 SQLite、启动 MediaCrawler WebUI API |
+| 如何处理端口占用 | 启动前通过 `lsof -ti tcp:8080` 查找占用 `8080` 的旧进程；如果存在，则自动 `kill` |
+| 是否是插件专属启动器 | 不是，仍然使用 MediaCrawler 标准 `main.py` 和 `api.main:app` |
+| 适合场景 | 本机第一次启动或不确定环境是否完整时 |
+| 后续日常启动 | 如果依赖和数据库已初始化，只需要执行 `uv run uvicorn api.main:app --host 127.0.0.1 --port 8080` |
 
-## 18. 当前关键配置
+### 18.3 初始化数据库
+
+| 场景 | 命令 | 说明 |
+| --- | --- | --- |
+| 初始化 SQLite 表 | `uv run python main.py --init_db sqlite` | 创建 Google Maps 点位、任务、店铺、任务结果、运行日志表 |
+| 检查数据库 | `uv run python tools/google_maps_smoke_check.py` | 检查点位、任务、SQLite 表和记录数 |
+
+### 18.4 CLI 方式启动采集
+
+| 场景 | 命令 | 说明 |
+| --- | --- | --- |
+| 采集 1 个任务到 JSONL | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option jsonl --headless false` | 快速验证浏览器和字段输出 |
+| 采集 1 个任务到 SQLite | `GOOGLE_MAPS_TASK_LIMIT=1 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` | 推荐验证方式，支持任务状态和去重 |
+| 小批量采集 | `GOOGLE_MAPS_TASK_LIMIT=10 GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK=5 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` | 控制风险，适合逐步扩大采集范围 |
+| 全量采集 | `GOOGLE_MAPS_TASK_LIMIT=0 uv run python main.py --platform google_maps --type search --save_data_option sqlite --headless false` | 执行全部 25125 个任务，需确认限速、运行时间和合规风险 |
+
+### 18.5 WebUI/API 方式启动
+
+| 步骤 | 命令/操作 | 说明 |
+| --- | --- | --- |
+| 1 | `uv run uvicorn api.main:app --host 127.0.0.1 --port 8080` | 按 MediaCrawler 原 WebUI API 方式启动 |
+| 2 | 打开 `http://127.0.0.1:8080/google-maps` | 使用 Google Maps 插件专属控制页 |
+| 3 | 查看点位数、关键词数、计划任务数、任务状态 | 页面会读取 `/api/google-maps/summary` 和 `/api/google-maps/tasks/status` |
+| 4 | 保存方式选择 `SQLite Database` | 推荐使用 SQLite，支持去重、断点续采和报告 |
+| 5 | 设置任务数量，例如 `1`、`3`、`10` | 对应 `GOOGLE_MAPS_TASK_LIMIT` |
+| 6 | 设置单任务店铺上限，例如 `5` 或 `20` | 对应 `GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK` |
+| 7 | 设置失败重试次数，例如 `1` 或 `2` | 对应 `GOOGLE_MAPS_MAX_RETRY_TIMES` |
+| 8 | 点击“点位文件”的“选择文件”按钮 | 从电脑目录中选择 CSV 文件，页面会上传到 MediaCrawler 本地输入目录 |
+| 9 | 浏览器模式选择“有界面” | macOS 本机真实采集推荐 headed 模式 |
+| 10 | 点击“启动” | 由 MediaCrawler API 调用 `main.py --platform google_maps` 启动采集，并使用已选择的点位文件 |
+| 11 | 采集完成后查看报告或导出 CSV/JSON | 页面提供报告、店铺列表和导出入口 |
+
+### 18.6 原始主页与 Google Maps 专属页的区别
+
+| 页面 | 地址 | 用途 | 注意事项 |
+| --- | --- | --- | --- |
+| MediaCrawler 原始主页 | `http://127.0.0.1:8080/` | 原项目通用控制台 | 下拉框可出现 Google Maps，但没有完整 Google Maps 专属参数和报告区 |
+| Google Maps 专属页 | `http://127.0.0.1:8080/google-maps` | Google Maps 点位采集控制台 | 推荐使用，支持任务预览、启动、停止、状态、报告和导出 |
+
+如果在原始主页选择了 `Google Maps` 但界面没有明显变化，这是因为原始 React WebUI 没有为 Google Maps 重建专属表单。Google Maps 插件完整操作入口是 `/google-maps`。
+
+### 18.7 常用接口
+
+| 接口 | 说明 |
+| --- | --- |
+| `/api/config/google-maps` | 查看 Google Maps 当前配置 |
+| `/api/google-maps/summary` | 查看点位数、关键词数、计划任务数、数据库统计 |
+| `/api/google-maps/tasks/preview?limit=20` | 预览生成的点位关键词任务 |
+| `/api/google-maps/points/upload` | 上传用户从电脑目录中选择的点位 CSV 文件 |
+| `/api/google-maps/tasks/status` | 查看任务状态分布 |
+| `/api/google-maps/tasks/reset` | 将指定状态任务重置为 `pending` |
+| `/api/google-maps/shops?limit=100` | 查看已采集店铺 |
+| `/api/google-maps/report` | 查看关键词、分类、城市、店铺状态聚合报告 |
+| `/api/google-maps/export?file_type=csv` | 导出 CSV |
+| `/api/google-maps/export?file_type=json` | 导出 JSON |
+| `/api/google-maps/run-logs` | 查看持久化运行日志 |
+
+### 18.8 自检与验收
+
+| 场景 | 命令 | 预期 |
+| --- | --- | --- |
+| 插件单元测试 | `uv run pytest tests/test_google_maps_plugin.py -q` | `7 passed` |
+| 本地自检 | `uv run python tools/google_maps_smoke_check.py` | 点位、任务、SQLite 检查为 `PASS` |
+| API 自检 | `uv run python tools/google_maps_smoke_check.py --api-url http://127.0.0.1:8080` | API、点位、任务、SQLite 检查为 `PASS` |
+
+## 19. 当前关键配置
 
 | 配置 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -283,7 +403,7 @@ config/
 | `GOOGLE_MAPS_ZOOM` | `20z` | 地图缩放级别 |
 | `GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK` | `20` | 单任务最多进入详情页数量 |
 
-## 19. 当前真实采集验证结果
+## 20. 当前真实采集验证结果
 
 | 验证项 | 结果 |
 | --- | --- |

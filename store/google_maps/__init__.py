@@ -64,3 +64,16 @@ async def sync_google_maps_points_and_tasks(points: list[dict], tasks: list[dict
     store = GoogleMapsStoreFactory.create_store()
     if hasattr(store, "sync_points_and_tasks"):
         await store.sync_points_and_tasks(points, tasks)
+
+
+async def add_google_maps_run_log(task_id: str, level: str, message: str, screenshot_path: str = ""):
+    store = GoogleMapsStoreFactory.create_store()
+    if hasattr(store, "store_run_log"):
+        await store.store_run_log(
+            {
+                "task_id": task_id,
+                "level": level,
+                "message": message,
+                "screenshot_path": screenshot_path,
+            }
+        )
