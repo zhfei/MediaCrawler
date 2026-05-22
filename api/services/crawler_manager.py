@@ -119,6 +119,19 @@ class CrawlerManager:
 
             try:
                 # Start subprocess
+                env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+                env.setdefault("UV_CACHE_DIR", "/private/tmp/mediacrawler-uv-cache")
+                env.setdefault("MPLCONFIGDIR", "/private/tmp/mediacrawler-mpl")
+                if config.platform.value == "google_maps":
+                    env["GOOGLE_MAPS_ENABLE_CDP_MODE"] = os.environ.get("GOOGLE_MAPS_ENABLE_CDP_MODE", "false")
+                    env["GOOGLE_MAPS_TASK_LIMIT"] = str(config.google_maps_task_limit)
+                    env["GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK"] = str(
+                        config.google_maps_max_result_links_per_task
+                    )
+                    env["GOOGLE_MAPS_MAX_RETRY_TIMES"] = str(config.google_maps_max_retry_times)
+                    if config.google_maps_points_file:
+                        env["GOOGLE_MAPS_POINTS_FILE"] = config.google_maps_points_file
+
                 self.process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
@@ -127,7 +140,7 @@ class CrawlerManager:
                     encoding='utf-8',
                     bufsize=1,
                     cwd=str(self._project_root),
-                    env={**os.environ, "PYTHONUNBUFFERED": "1"}
+                    env=env
                 )
 
                 self.status = "running"

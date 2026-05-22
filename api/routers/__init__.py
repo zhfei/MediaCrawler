@@ -18,6 +18,7 @@
 
 from .crawler import router as crawler_router
 from .data import router as data_router
+from .google_maps import router as google_maps_router
 from .websocket import router as websocket_router
 
-__all__ = ["crawler_router", "data_router", "websocket_router"]
+__all__ = ["crawler_router", "data_router", "google_maps_router", "websocket_router"]

@@ -30,7 +30,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .routers import crawler_router, data_router, websocket_router
+from .routers import crawler_router, data_router, google_maps_router, websocket_router
+import config
 
 app = FastAPI(
     title="MediaCrawler WebUI API",
@@ -58,6 +59,7 @@ app.add_middleware(
 # Register routers
 app.include_router(crawler_router, prefix="/api")
 app.include_router(data_router, prefix="/api")
+app.include_router(google_maps_router, prefix="/api")
 app.include_router(websocket_router, prefix="/api")
 
 
@@ -73,6 +75,15 @@ async def serve_frontend():
         "docs": "/docs",
         "note": "WebUI not found, please build it first: cd webui && npm run build"
     }
+
+
+@app.get("/google-maps")
+async def serve_google_maps_control():
+    """Return Google Maps plugin control page."""
+    page_path = os.path.join(WEBUI_DIR, "google_maps.html")
+    if os.path.exists(page_path):
+        return FileResponse(page_path)
+    return {"message": "Google Maps control page not found"}
 
 
 @app.get("/api/health")
@@ -166,7 +177,27 @@ async def get_config_options():
             {"value": "sqlite", "label": "SQLite Database"},
             {"value": "db", "label": "MySQL Database"},
             {"value": "mongodb", "label": "MongoDB Database"},
+            {"value": "postgres", "label": "PostgreSQL Database"},
         ],
+    }
+
+
+@app.get("/api/config/google-maps")
+async def get_google_maps_config():
+    """Get Google Maps platform-specific configuration"""
+    return {
+        "points_file": config.GOOGLE_MAPS_POINTS_FILE,
+        "country": config.GOOGLE_MAPS_COUNTRY,
+        "locale": config.GOOGLE_MAPS_LOCALE,
+        "timezone": config.GOOGLE_MAPS_TIMEZONE,
+        "zoom": config.GOOGLE_MAPS_ZOOM,
+        "task_limit": config.GOOGLE_MAPS_TASK_LIMIT,
+        "max_result_links_per_task": config.GOOGLE_MAPS_MAX_RESULT_LINKS_PER_TASK,
+        "max_retry_times": config.GOOGLE_MAPS_MAX_RETRY_TIMES,
+        "enable_cdp_mode": config.GOOGLE_MAPS_ENABLE_CDP_MODE,
+        "use_system_chrome": config.GOOGLE_MAPS_USE_SYSTEM_CHROME,
+        "chrome_executable_path": config.GOOGLE_MAPS_CHROME_EXECUTABLE_PATH,
+        "keywords": config.GOOGLE_MAPS_KEYWORDS,
     }
 
 

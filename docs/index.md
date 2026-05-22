@@ -3,6 +3,7 @@
 ## 项目文档
 
 - [项目架构文档](项目架构文档.md) - 系统架构、模块设计、数据流向（含 Mermaid 图表）
+- [Google Maps 平台插件使用指南](google_maps_plugin_guide.md) - 点位任务、WebUI、SQLite、导出和验收说明
 
 ## 推荐：使用 uv 管理依赖
 

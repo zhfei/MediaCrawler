@@ -30,6 +30,7 @@ class PlatformEnum(str, Enum):
     WEIBO = "wb"
     TIEBA = "tieba"
     ZHIHU = "zhihu"
+    GOOGLE_MAPS = "google_maps"
 
 
 class LoginTypeEnum(str, Enum):
@@ -55,6 +56,7 @@ class SaveDataOptionEnum(str, Enum):
     SQLITE = "sqlite"
     MONGODB = "mongodb"
     EXCEL = "excel"
+    POSTGRES = "postgres"
 
 
 class CrawlerStartRequest(BaseModel):
@@ -71,6 +73,10 @@ class CrawlerStartRequest(BaseModel):
     save_option: SaveDataOptionEnum = SaveDataOptionEnum.JSONL
     cookies: str = ""
     headless: bool = False
+    google_maps_task_limit: int = 1
+    google_maps_max_result_links_per_task: int = 20
+    google_maps_max_retry_times: int = 2
+    google_maps_points_file: str = ""
 
 
 class CrawlerStatusResponse(BaseModel):
