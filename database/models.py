@@ -16,7 +16,7 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
-from sqlalchemy import create_engine, Column, Integer, Text, String, BigInteger
+from sqlalchemy import create_engine, Column, Integer, Text, String, BigInteger, Float, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -450,3 +450,94 @@ class ZhihuCreator(Base):
     get_voteup_count = Column(Integer, default=0, comment='获赞数')
     add_ts = Column(BigInteger, comment='添加时间戳')
     last_modify_ts = Column(BigInteger, comment='最后修改时间戳')
+
+
+class GoogleMapsPoint(Base):
+    __tablename__ = 'google_maps_points'
+    __table_args__ = (
+        UniqueConstraint('country', 'city', 'lat', 'lng', name='uq_google_maps_point_location'),
+    )
+    id = Column(Integer, primary_key=True, comment='主键ID')
+    city = Column(String(120), index=True, comment='城市')
+    address = Column(Text, default='', comment='点位地址')
+    country = Column(String(16), index=True, comment='国家')
+    lat = Column(Float, index=True, comment='采集点纬度')
+    lng = Column(Float, index=True, comment='采集点经度')
+    add_ts = Column(BigInteger, comment='添加时间戳')
+    last_modify_ts = Column(BigInteger, comment='最后修改时间戳')
+
+
+class GoogleMapsTask(Base):
+    __tablename__ = 'google_maps_tasks'
+    id = Column(Integer, primary_key=True, comment='主键ID')
+    task_id = Column(String(64), unique=True, index=True, comment='任务ID')
+    city = Column(String(120), index=True, comment='城市')
+    address = Column(Text, default='', comment='点位地址')
+    country = Column(String(16), index=True, comment='国家')
+    crawl_lat = Column(Float, index=True, comment='采集点纬度')
+    crawl_lng = Column(Float, index=True, comment='采集点经度')
+    keyword = Column(String(120), index=True, comment='关键词')
+    status = Column(String(32), index=True, comment='任务状态')
+    retry_count = Column(Integer, default=0, comment='重试次数')
+    last_error = Column(Text, default='', comment='最后错误')
+    add_ts = Column(BigInteger, comment='添加时间戳')
+    last_modify_ts = Column(BigInteger, comment='最后修改时间戳')
+
+
+class GoogleMapsShop(Base):
+    __tablename__ = 'google_maps_shops'
+    id = Column(Integer, primary_key=True, comment='主键ID')
+    shop_id = Column(String(255), unique=True, index=True, comment='Google Maps 店铺ID')
+    keyword = Column(Text, default='[]', comment='命中关键词集合')
+    platform = Column(String(40), default='GoogleMap', comment='平台')
+    city = Column(String(120), index=True, comment='城市')
+    shop_name = Column(Text, comment='店铺名称')
+    level = Column(Float, nullable=True, comment='评分')
+    category = Column(Text, default='[]', comment='品类')
+    is_open = Column(Text, default='', comment='营业状态')
+    shop_lat = Column(Float, nullable=True, comment='店铺纬度')
+    shop_lng = Column(Float, nullable=True, comment='店铺经度')
+    crawl_lat = Column(Float, nullable=True, comment='采集点纬度')
+    crawl_lng = Column(Float, nullable=True, comment='采集点经度')
+    address = Column(Text, default='', comment='地址')
+    phone = Column(Text, default='', comment='电话')
+    order_url = Column(Text, default='', comment='下单URL')
+    official_url = Column(Text, default='', comment='官网URL')
+    user_ratings_total = Column(Integer, default=0, comment='评论数')
+    avg_price = Column(Text, default='', comment='原始人均消费')
+    open_hours = Column(Text, default='[]', comment='营业时间')
+    report_count = Column(Integer, default=1, comment='召回次数')
+    menu_url = Column(Text, default='', comment='菜单URL')
+    service_options = Column(Text, default='[]', comment='服务项')
+    busy_time = Column(Text, default='', comment='繁忙时间')
+    create_time = Column(String(32), default='', comment='数据创建时间')
+    real_shop_state = Column(String(40), default='正常营业', comment='店铺状态')
+    currency_symbol = Column(String(16), default='', comment='货币符号')
+    price_range = Column(String(40), default='', comment='价格带')
+    consumption_level = Column(String(8), default='', comment='消费等级')
+    detail_url = Column(Text, default='', comment='详情链接')
+    add_ts = Column(BigInteger, comment='添加时间戳')
+    last_modify_ts = Column(BigInteger, comment='最后修改时间戳')
+
+
+class GoogleMapsTaskResult(Base):
+    __tablename__ = 'google_maps_task_results'
+    __table_args__ = (
+        UniqueConstraint('task_id', 'shop_id', name='uq_google_maps_task_shop'),
+    )
+    id = Column(Integer, primary_key=True, comment='主键ID')
+    task_id = Column(String(64), index=True, comment='任务ID')
+    shop_id = Column(String(255), index=True, comment='店铺ID')
+    keyword = Column(String(120), index=True, comment='关键词')
+    add_ts = Column(BigInteger, comment='添加时间戳')
+    last_modify_ts = Column(BigInteger, comment='最后修改时间戳')
+
+
+class GoogleMapsRunLog(Base):
+    __tablename__ = 'google_maps_run_logs'
+    id = Column(Integer, primary_key=True, comment='主键ID')
+    task_id = Column(String(64), index=True, comment='任务ID')
+    level = Column(String(32), index=True, comment='日志等级')
+    message = Column(Text, comment='日志内容')
+    screenshot_path = Column(Text, default='', comment='截图路径')
+    add_ts = Column(BigInteger, comment='添加时间戳')
