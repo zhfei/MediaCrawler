@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Body, Header
+from fastapi import APIRouter, Body, Header, HTTPException, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,7 @@ from media_platform.google_maps.field import GOOGLE_MAPS_SHOP_OUTPUT_FIELDS
 from media_platform.google_maps.help import build_tasks, load_points_from_csv, resolve_points_file
 
 router = APIRouter(prefix="/google-maps", tags=["google-maps"])
+MAX_POINTS_FILE_SIZE = 10 * 1024 * 1024
 
 
 class GoogleMapsTaskResetRequest(BaseModel):
@@ -46,13 +47,40 @@ async def google_maps_points_upload(
     x_filename: str = Header(default="points.csv"),
 ):
     """Upload a local points CSV selected in browser and return server-side path."""
+    if not body:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Points CSV is empty",
+        )
+    if len(body) > MAX_POINTS_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Points CSV exceeds {MAX_POINTS_FILE_SIZE // 1024 // 1024}MB limit",
+        )
+
     filename = _safe_csv_filename(x_filename)
     upload_dir = Path("data/google_maps/input")
     upload_dir.mkdir(parents=True, exist_ok=True)
     file_path = upload_dir / filename
-    file_path.write_bytes(body)
 
-    points = load_points_from_csv(file_path)
+    tmp_path = upload_dir / f".{filename}.uploading"
+    try:
+        tmp_path.write_bytes(body)
+        points = load_points_from_csv(tmp_path)
+    except Exception as exc:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid points CSV: {exc}",
+        ) from exc
+    if not points:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid points CSV: no valid point rows found",
+        )
+
+    tmp_path.replace(file_path)
     tasks = build_tasks(points)
     return {
         "success": True,

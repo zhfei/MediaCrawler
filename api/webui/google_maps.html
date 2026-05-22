@@ -227,7 +227,6 @@
                 <option value="jsonl">JSONL File</option>
                 <option value="csv">CSV File</option>
                 <option value="json">JSON File</option>
-                <option value="postgres">PostgreSQL Database</option>
               </select>
             </div>
             <div>
@@ -321,6 +320,7 @@
     <script>
       const $ = (id) => document.getElementById(id);
       let selectedPointsFile = "";
+      let initialConfigLoaded = false;
 
       async function request(path, options = {}) {
         const response = await fetch(path, options);
@@ -349,9 +349,12 @@
         $("keywords").textContent = summary.keywords;
         $("plannedTasks").textContent = summary.planned_tasks;
         $("shops").textContent = summary.db.google_maps_shops || 0;
-        $("taskLimit").value = summary.task_limit;
-        $("maxLinks").value = summary.max_result_links_per_task;
-        $("maxRetries").value = summary.max_retry_times;
+        if (!initialConfigLoaded) {
+          $("taskLimit").value = summary.task_limit;
+          $("maxLinks").value = summary.max_result_links_per_task;
+          $("maxRetries").value = summary.max_retry_times;
+          initialConfigLoaded = true;
+        }
         if (!selectedPointsFile) {
           selectedPointsFile = summary.points_file;
           $("pointsInput").value = summary.points_file;

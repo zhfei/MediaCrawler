@@ -18,15 +18,32 @@
 
 from fastapi import APIRouter, HTTPException
 
-from ..schemas import CrawlerStartRequest, CrawlerStatusResponse
+from ..schemas import CrawlerStartRequest, CrawlerStatusResponse, PlatformEnum, SaveDataOptionEnum
 from ..services import crawler_manager
 
 router = APIRouter(prefix="/crawler", tags=["crawler"])
+
+GOOGLE_MAPS_ALLOWED_SAVE_OPTIONS = {
+    SaveDataOptionEnum.SQLITE,
+    SaveDataOptionEnum.JSONL,
+    SaveDataOptionEnum.CSV,
+    SaveDataOptionEnum.JSON,
+}
 
 
 @router.post("/start")
 async def start_crawler(request: CrawlerStartRequest):
     """Start crawler task"""
+    if (
+        request.platform == PlatformEnum.GOOGLE_MAPS
+        and request.save_option not in GOOGLE_MAPS_ALLOWED_SAVE_OPTIONS
+    ):
+        allowed = sorted(option.value for option in GOOGLE_MAPS_ALLOWED_SAVE_OPTIONS)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google Maps only supports save_option: {', '.join(allowed)}",
+        )
+
     success = await crawler_manager.start(request)
     if not success:
         # Handle concurrent/duplicate requests: if process is already running, return 400 instead of 500

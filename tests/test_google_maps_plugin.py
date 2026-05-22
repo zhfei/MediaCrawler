@@ -3,7 +3,13 @@
 import csv
 from pathlib import Path
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 import config
+import api.routers as api_routers
+from api.routers.crawler import router as crawler_router
+from api.routers.google_maps import router as google_maps_router
 from media_platform.google_maps.field import GOOGLE_MAPS_SHOP_OUTPUT_FIELDS
 from media_platform.google_maps.help import (
     build_maps_search_url,
@@ -146,3 +152,60 @@ def test_google_maps_output_fields_include_required_scheme_fields():
     }
 
     assert required_fields.issubset(set(GOOGLE_MAPS_SHOP_OUTPUT_FIELDS))
+
+
+def test_google_maps_points_upload_validates_before_final_save(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    app = FastAPI()
+    app.include_router(google_maps_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/google-maps/points/upload",
+        content=b"city,country,lat,lng\nbad,BR,not-a-lat,-43.1\n",
+        headers={"X-Filename": "bad.csv", "Content-Type": "text/csv"},
+    )
+
+    assert response.status_code == 400
+    assert not (tmp_path / "data/google_maps/input/bad.csv").exists()
+
+
+def test_google_maps_points_upload_accepts_browser_selected_csv(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    app = FastAPI()
+    app.include_router(google_maps_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/google-maps/points/upload",
+        content=b"city,address,country,lat,lng\nItabira,Centro,BR,-19.628,-43.232\n",
+        headers={"X-Filename": "points.csv", "Content-Type": "text/csv"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["points"] == 1
+    assert body["planned_tasks"] == len(config.GOOGLE_MAPS_KEYWORDS)
+    assert (tmp_path / "data/google_maps/input/points.csv").exists()
+
+
+def test_google_maps_start_rejects_postgres_save_option():
+    app = FastAPI()
+    app.include_router(crawler_router)
+    client = TestClient(app)
+
+    response = client.post(
+        "/crawler/start",
+        json={
+            "platform": "google_maps",
+            "crawler_type": "search",
+            "save_option": "postgres",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Google Maps only supports save_option" in response.json()["detail"]
+
+
+def test_google_maps_router_is_exported_from_api_routers():
+    assert "google_maps_router" in api_routers.__all__

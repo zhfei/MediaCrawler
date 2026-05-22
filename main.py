@@ -137,7 +137,7 @@ async def async_cleanup() -> None:
                 if "closed" not in error_msg and "disconnected" not in error_msg:
                     print(f"[Main] Error closing browser context: {e}")
 
-    if config.SAVE_DATA_OPTION in ("db", "sqlite"):
+    if config.SAVE_DATA_OPTION in ("db", "sqlite", "postgres"):
         await db.close()
 
 if __name__ == "__main__":
